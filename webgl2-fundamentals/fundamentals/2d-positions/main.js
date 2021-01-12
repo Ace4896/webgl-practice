@@ -61,7 +61,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
 }
 
 (async () => {
-    // Setup canvas + viewport
+    // Setup canvas
     let canvas = document.getElementById("gl-canvas");
     let gl = canvas.getContext("webgl2");
     if (!gl) {
