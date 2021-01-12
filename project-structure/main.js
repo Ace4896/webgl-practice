@@ -1,4 +1,4 @@
-import {loadTextFile} from "./modules/misc-utils.js";
+import {getTextFile} from "./modules/misc-utils.js";
 import {getWebGL2Context, initShaderProgram} from "./modules/webgl-utils.js";
 
 /**
@@ -140,8 +140,8 @@ function drawScene(gl, programInfo, buffers) {
         return;
     }
 
-    const vsSource = await loadTextFile("./shaders/vertex.shader");
-    const fsSource = await loadTextFile("./shaders/fragment.shader");
+    const vsSource = await getTextFile("./shaders/vertex.shader");
+    const fsSource = await getTextFile("./shaders/fragment.shader");
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 
     // Something I wish I used before (instead of globals).
