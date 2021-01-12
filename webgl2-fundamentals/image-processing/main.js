@@ -10,10 +10,20 @@ async function loadTextFile(url) {
     return response.text();
 }
 
-function loadImage(url) {
-    let image = new Image();
-    image.src = url;
-    image.onload = () => render(image);
+/**
+ * (Async) Loads an image asynchronously.
+ * Inspired by [this SO answer](https://stackoverflow.com/a/52982580/14727120).
+ *
+ * @param url {string} The URL or path to the image
+ * @returns {Promise<HTMLImageElement>} A promise for the loaded image
+ */
+function loadImageAsync(url) {
+    return new Promise(((resolve, reject) => {
+        let image = new Image();
+        image.src = url;
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error(`Could not load image from '${url}'`));
+    }));
 }
 
 /**
@@ -84,7 +94,7 @@ function setRectangle(gl, x, y, width, height) {
     ]), gl.STATIC_DRAW);
 }
 
-async function render(image) {
+async function main() {
     // Setup canvas
     let canvas = document.getElementById("gl-canvas");
     let gl = canvas.getContext("webgl2");
@@ -101,127 +111,138 @@ async function render(image) {
     let fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     let shaderProgram = createProgram(gl, vertexShader, fragmentShader);
 
-    // Setup attributes and uniforms
-    let positionAttributeLocation = gl.getAttribLocation(shaderProgram, "a_position");
-    let texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, "a_texCoord");
+    // Load the image and begin rendering
+    let img = loadImageAsync("./leaves.jpeg");
+    img.then(async (image) => {
 
-    let resolutionUniformLocation = gl.getUniformLocation(shaderProgram, "u_resolution");
-    let imageLocation = gl.getUniformLocation(shaderProgram, "u_image");
+        // Setup attributes and uniforms
+        let positionAttributeLocation = gl.getAttribLocation(shaderProgram, "a_position");
+        let texCoordAttributeLocation = gl.getAttribLocation(shaderProgram, "a_texCoord");
 
-    // Setup position buffer
-    let vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    let positionBuffer = gl.createBuffer();
-    gl.enableVertexAttribArray(positionAttributeLocation);
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        let resolutionUniformLocation = gl.getUniformLocation(shaderProgram, "u_resolution");
+        let imageLocation = gl.getUniformLocation(shaderProgram, "u_image");
 
-    // Specify how data is retrieved from the buffer
-    {
-        const size = 2;             // 2 components per iteration (since we're using 2D positions)
-        const type = gl.FLOAT;      // We're using 32-bit floating point numbers
-        const normalize = false;    // Don't normalize the data
-        const stride = 0;           // How many bytes to move by to get to the next position
-                                    // 0 is the default, i.e. auto-detect; equivalent to size * sizeof(type)
-        const offset = 0;           // Start at the beginning of the buffer
-
-        gl.vertexAttribPointer(
-            positionAttributeLocation,
-            size,
-            type,
-            normalize,
-            stride,
-            offset
-        );
-    }
-
-    // Setup texture and it's buffer
-    // Configure the attribute for this buffer
-    let texCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-
-    // Draw two triangles to form the rectangle
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        0.0,  0.0,
-        1.0,  0.0,
-        0.0,  1.0,
-        0.0,  1.0,
-        1.0,  0.0,
-        1.0,  1.0,
-    ]), gl.STATIC_DRAW);
-
-    gl.enableVertexAttribArray(texCoordAttributeLocation);
-    {
-        let size = 2;           // Two components per iteration
-        let type = gl.FLOAT;    // 32-bit floating point values
-        let normalise = false;  // Don't normalise
-        let stride = 0;         // Auto-detect how many bytes to move by in each iteration
-        let offset = 0;         // Start from beginning of buffer
-        gl.vertexAttribPointer(
-            texCoordAttributeLocation,
-            size,
-            type,
-            normalise,
-            stride,
-            offset
-        );
-    }
-
-    // Create the texture
-    let texture = gl.createTexture();
-
-    // Make unit 0 the active texture unit, i.e. the unit that all other texture commands affect
-    const TEXTURE_UNIT = 0;
-    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNIT);
-
-    // Bind it to texture unit 0's 2D bind point
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    // Set the parameters so we don't need mips and so we're not filtering and we don't repeat
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-
-    // Upload the image into the texture.
-    let mipLevel = 0;               // the largest mip
-    let internalFormat = gl.RGBA;   // format we want in the texture
-    let srcFormat = gl.RGBA;        // format of data we are supplying
-    let srcType = gl.UNSIGNED_BYTE  // type of data we are supplying
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        mipLevel,
-        internalFormat,
-        srcFormat,
-        srcType,
-        image
-    );
-
-    // Render the main scene
-    {
-        gl.useProgram(shaderProgram);
-
+        // Setup position buffer
+        let vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
-
-        // Pass in the canvas resolution so we can convert from
-        // pixels to clipspace in the shader
-        gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
-
-        // Tell the shader to get the texture from texture unit 0
-        gl.uniform1i(imageLocation, TEXTURE_UNIT);
-
-        // Bind the position buffer so gl.bufferData that will be called
-        // in setRectangle puts data in the position buffer
+        let positionBuffer = gl.createBuffer();
+        gl.enableVertexAttribArray(positionAttributeLocation);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-        // Set a rectangle the same size as the image.
-        setRectangle(gl, 0, 0, image.width, image.height);
+        // Specify how data is retrieved from the buffer
+        {
+            const size = 2;             // 2 components per iteration (since we're using 2D positions)
+            const type = gl.FLOAT;      // We're using 32-bit floating point numbers
+            const normalize = false;    // Don't normalize the data
+            const stride = 0;           // How many bytes to move by to get to the next position
+                                        // 0 is the default, i.e. auto-detect; equivalent to size * sizeof(type)
+            const offset = 0;           // Start at the beginning of the buffer
 
-        let primitiveType = gl.TRIANGLES;
-        let offset = 0;
-        let count = 6;
-        gl.drawArrays(primitiveType, offset, count);
-    }
+            gl.vertexAttribPointer(
+                positionAttributeLocation,
+                size,
+                type,
+                normalize,
+                stride,
+                offset
+            );
+        }
+
+        // Setup texture and it's buffer
+        // Configure the attribute for this buffer
+        let texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+
+        // Draw two triangles to form the rectangle
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            0.0,  0.0,
+            1.0,  0.0,
+            0.0,  1.0,
+            0.0,  1.0,
+            1.0,  0.0,
+            1.0,  1.0,
+        ]), gl.STATIC_DRAW);
+
+        gl.enableVertexAttribArray(texCoordAttributeLocation);
+        {
+            let size = 2;           // Two components per iteration
+            let type = gl.FLOAT;    // 32-bit floating point values
+            let normalise = false;  // Don't normalise
+            let stride = 0;         // Auto-detect how many bytes to move by in each iteration
+            let offset = 0;         // Start from beginning of buffer
+            gl.vertexAttribPointer(
+                texCoordAttributeLocation,
+                size,
+                type,
+                normalise,
+                stride,
+                offset
+            );
+        }
+
+        // Create the texture
+        let texture = gl.createTexture();
+
+        // Make unit 0 the active texture unit, i.e. the unit that all other texture commands affect
+        const TEXTURE_UNIT = 0;
+        gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNIT);
+
+        // Bind it to texture unit 0's 2D bind point
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        // Set the parameters so we don't need mips and so we're not filtering and we don't repeat
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+        // Upload the image into the texture.
+        let mipLevel = 0;               // the largest mip
+        let internalFormat = gl.RGBA;   // format we want in the texture
+        let srcFormat = gl.RGBA;        // format of data we are supplying
+        let srcType = gl.UNSIGNED_BYTE  // type of data we are supplying
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            mipLevel,
+            internalFormat,
+            srcFormat,
+            srcType,
+            image
+        );
+
+        // Render the main scene
+        {
+            // Tell WebGL how to convert from clip space to pixels
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+            // Clear the canvas
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            gl.useProgram(shaderProgram);
+
+            gl.bindVertexArray(vao);
+
+            // Pass in the canvas resolution so we can convert from
+            // pixels to clipspace in the shader
+            gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+
+            // Tell the shader to get the texture from texture unit 0
+            gl.uniform1i(imageLocation, TEXTURE_UNIT);
+
+            // Bind the position buffer so gl.bufferData that will be called
+            // in setRectangle puts data in the position buffer
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+            // Set a rectangle the same size as the image.
+            setRectangle(gl, 0, 0, image.width, image.height);
+
+            let primitiveType = gl.TRIANGLES;
+            let offset = 0;
+            let count = 6;
+            gl.drawArrays(primitiveType, offset, count);
+        }
+    })
 }
 
-// Main Function
-loadImage("./leaves.jpeg");
+window.onload = main;
