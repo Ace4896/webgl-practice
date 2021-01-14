@@ -2,9 +2,10 @@
 
 precision highp float;
 
+uniform vec4 uColour;
+
 out vec4 outColour;
 
 void main() {
-    // Set the output colour to white
-    outColour = vec4(1.0, 1.0, 1.0, 1.0);
+    outColour = uColour;
 }

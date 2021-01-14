@@ -39,6 +39,10 @@ function circleToTriangleFan(centreX, centreY, radius, steps) {
     return positions;
 }
 
+function randomInt(range) {
+    return Math.floor(Math.random() * range);
+}
+
 async function main() {
     let canvas = document.getElementById("gl-canvas");
     if (!canvas) {
@@ -60,19 +64,15 @@ async function main() {
     }
 
     // Setup attributes and uniforms
+    // Vertex shader
     let positionAttributeLocation = gl.getAttribLocation(program, "aPosition");
     let resolutionUniformLocation = gl.getUniformLocation(program, "uResolution");
 
+    // Fragment shader
+    let colourUniformLocation = gl.getUniformLocation(program, "uColour");
+
     let positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    const centreX = 640;
-    const centreY = 360;
-    const radius = 100;
-    const steps = 64;
-
-    let positions = circleToTriangleFan(centreX, centreY, radius, steps);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
     // Setup VAO
     let vao = gl.createVertexArray();
@@ -112,9 +112,22 @@ async function main() {
 
         let primitiveType = gl.TRIANGLE_FAN;
         let offset = 0;
-        let count = positions.length / 2;
+        let steps = 32;
 
-        gl.drawArrays(primitiveType, offset, count);
+        // Draw 10 circles with different centres and radii
+        for (let i = 0; i < 10; i++) {
+            let centreX = 640 + randomInt(500);
+            let centreY = 360 + randomInt(250);
+            let radius = 50 + randomInt(50);
+
+            let positions = circleToTriangleFan(centreX, centreY, radius, steps);
+            let count = positions.length / 2;
+
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+            gl.uniform4f(colourUniformLocation, Math.random(), Math.random(), Math.random(), 1.0);
+
+            gl.drawArrays(primitiveType, offset, count);
+        }
     }
 }
 
