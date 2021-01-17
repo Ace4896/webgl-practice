@@ -1,162 +1,138 @@
 import {getTextFile} from "./modules/misc-utils.js";
-import {getWebGL2Context, initShaderProgram} from "./modules/webgl-utils.js";
+import {initShaderProgram} from "./modules/webgl-utils.js";
 
 /**
- * Initialises buffers for the vertex positions.
- * @param gl {WebGL2RenderingContext} The WebGL rendering context
+ * Class representing a vertex/fragment shader pair.
  */
-function initBuffers(gl) {
-    // Create a buffer for the square's positions
-    const positionBuffer = gl.createBuffer();
+class Shader {
+    static VERT_SOURCE = undefined;
+    static FRAG_SOURCE = undefined;
 
-    // Select the positionBuffer as the one to apply buffer operations to
-    // (from here on out)
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    /** @property {WebGLProgram} A compiled shader program. */
+    program;
 
-    // Create an array of positions for the square
-    const positions = [
-        -1.0, 1.0, // Top Left
-        1.0, 1.0, // Top Right
-        -1.0, -1.0, // Bottom Left
-        1.0, -1.0, // Bottom Right
-    ];
+    /**
+     * @property {GLint} attribs.position - The vertex position attribute
+     */
+    attribs;
 
-    // Pass the list of positions into WebGL to build the shape
-    // Done by creating a Float32Array from the JS array, then filling the current buffer
-    gl.bufferData(gl.ARRAY_BUFFER,
-        new Float32Array(positions),
-        gl.STATIC_DRAW);
+    /**
+     * @property {GLint} uniforms.resolution - The canvas resolution
+     */
+    uniforms;
 
-    return {
-        position: positionBuffer,
-    };
+    /**
+     * @property {WebGLBuffer} buffers.position - The vertex position buffer
+     */
+    buffers;
+
+    /** @property {WebGLVertexArrayObject} The VAO for this shader */
+    vao;
+
+    /**
+     * Initialises this shader. Needs to be done separately due to asynchronous operations.
+     * @param gl {WebGL2RenderingContext} The WebGL 2 rendering context.
+     */
+    async init(gl) {
+        if (!Shader.VERT_SOURCE || !Shader.FRAG_SOURCE) {
+            Shader.VERT_SOURCE = await getTextFile("./shaders/shader.vert");
+            Shader.FRAG_SOURCE = await getTextFile("./shaders/shader.frag");
+        }
+
+        let shaderProgram = initShaderProgram(gl, Shader.VERT_SOURCE, Shader.FRAG_SOURCE);
+        if (!shaderProgram) {
+            return;
+        }
+
+        this.program = shaderProgram;
+        this.attribs = {
+            position: gl.getAttribLocation(this.program, "aPosition"),
+        };
+        this.uniforms = {
+            resolution: gl.getUniformLocation(this.program, "uResolution"),
+        };
+        this.buffers = {
+            position: gl.createBuffer(),
+        };
+
+        this.vao = gl.createVertexArray();
+        gl.bindVertexArray(this.vao);
+
+        // Vertex Position
+        {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.position);
+            gl.enableVertexAttribArray(this.attribs.position);
+
+            const size = 2;
+            const type = gl.FLOAT;
+            const normalise = false;
+            const stride = 0;
+            const offset = 0;
+
+            gl.vertexAttribPointer(
+                this.attribs.position,
+                size,
+                type,
+                normalise,
+                stride,
+                offset,
+            );
+        }
+    }
 }
 
 /**
  * Draws the current scene.
- * This is equivalent to the lab's "render" function - can be named anything.
  * @param gl {WebGL2RenderingContext} The WebGL rendering context
- * @param programInfo
- * @param buffers
+ * @param shader {Shader} The shader program to use
  */
-function drawScene(gl, programInfo, buffers) {
-    // Set the clear colour to black; fully opaque
+function drawScene(gl, shader) {
+    gl.useProgram(shader.program);
+
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // Clear everything (not sure if this is needed TBH)
-    gl.clearDepth(1.0);
+    gl.uniform2f(shader.uniforms.resolution, gl.canvas.width, gl.canvas.height);
 
-    // Enable depth testing
-    gl.enable(gl.DEPTH_TEST);
+    // Draw a white square in the middle of the screen
+    const length = 100;
+    let x1 = (gl.canvas.width / 2) - (length / 2);
+    let x2 = x1 + length;
+    let y1 = (gl.canvas.height / 2) - (length / 2);
+    let y2 = y1 + length;
 
-    // Make it so that near things obscure far things
-    gl.depthFunc(gl.LEQUAL);
+    const positions = new Float32Array([
+        x1, y1,
+        x1, y2,
+        x2, y1,
+        x2, y2,
+    ]);
 
-    // Clear the canvas; must be done before drawing anything
-    // At minimum, COLOR_BUFFER_BIT is needed
-    // Since we're using depth testing, DEPTH_BUFFER_BIT is needed too
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.bindVertexArray(shader.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, shader.buffers.position);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
-    // Create a perspective matrix
-    // FOV: 45 degrees
-    // Width/Height Ratio: Match display size of canvas
-    // Near: 0.1
-    // Far: 100
-    const fov = 45 * Math.PI / 180; // Radians
-    const aspectRatio = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    const zNear = 0.1;
-    const zFar = 100.0;
-    const projectionMatrix = mat4.create();
-
-    // NOTE: gl-matrix.js uses first argument as destination to receive result
-    mat4.perspective(
-        projectionMatrix,
-        fov,
-        aspectRatio,
-        zNear,
-        zFar
-    );
-
-    // Set the drawing position to the "identity" point, i.e. the center
-    const modelViewMatrix = mat4.create();
-
-    // Move the drawing position back a bit
-    mat4.translate(
-        modelViewMatrix,
-        modelViewMatrix,
-        [-0.0, 0.0, -6.0]
-    );
-
-    // Tell WebGL how to pull out the positions from the position buffer into the vertexPosition attribute
-    {
-        const numComponents = 2;    // Two values per iteration (since we're in 2D)
-        const type = gl.FLOAT;      // We used floating point values for coordinates
-        const normalise = false;
-        const stride = 0;           // How many bytes to get from one set of values to the next
-                                    // 0 = use the type and numComponents above (i.e. auto)
-        const offset = 0;           // How many bytes inside the buffer to start from
-                                    // Since we're using all vertices in the array, start from 0
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-        gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexPosition,
-            numComponents,
-            type,
-            normalise,
-            stride,
-            offset
-        );
-        gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-    }
-
-    // Tell WebGL to use our program when drawing
-    gl.useProgram(programInfo.program);
-
-    // Set shader uniforms
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.projectionMatrix,
-        false,
-        projectionMatrix
-    );
-
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
-        false,
-        modelViewMatrix
-    );
-
-    // Finally, draw what's in the vertex buffer
-    {
-        const offset = 0;
-        const vertexCount = 4;
-        gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
-    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, positions.length / 2);
 }
 
-// Main Function
-(async () => {
-    const gl = getWebGL2Context("gl-canvas");
-    if (!gl) {
+/** The main method for this WebGL application */
+async function main() {
+    const canvas = document.getElementById("gl-canvas");
+    if (!canvas) {
+        console.log("Unable to find canvas with id 'gl-canvas'");
         return;
     }
 
-    const vsSource = await getTextFile("./shaders/vertex.shader");
-    const fsSource = await getTextFile("./shaders/fragment.shader");
-    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    const gl = canvas.getContext("webgl2");
+    if (!gl) {
+        console.log("WebGL 2 is not supported on this browser");
+        return;
+    }
 
-    // Something I wish I used before (instead of globals).
-    const programInfo = {
-        program: shaderProgram,
-        attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-        },
-        uniformLocations: {
-            projectionMatrix: gl.getUniformLocation(shaderProgram, "uProjectionMatrix"),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, "uModelViewMatrix"),
-        }
-    };
+    const shader = new Shader();
+    await shader.init(gl);
 
-    const buffers = initBuffers(gl);
+    drawScene(gl, shader);
+}
 
-    drawScene(gl, programInfo, buffers);
-})();
+window.onload = main;

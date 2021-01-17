@@ -1,25 +1,4 @@
 /**
- * Gets the WebGL 2 context from a canvas.
- * @param canvasId {string} The ID of the canvas
- * @returns {WebGL2RenderingContext} A WebGL 2 context, or null if an error occurred
- */
-export function getWebGL2Context(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) {
-        console.error(`Canvas with ID '${canvasId}' does not exist!`);
-        return null;
-    }
-
-    const context = canvas.getContext("webgl2");
-    if (!context) {
-        console.error("Unable to retrieve WebGL 2 context; it may not be supported");
-        return null;
-    }
-
-    return context;
-}
-
-/**
  * Initialise a shader program for the specified WebGL context
  * @param gl {WebGL2RenderingContext} The WebGL 2 rendering context
  * @param vsSource {string} The vertex shader code
@@ -36,9 +15,8 @@ export function initShaderProgram(gl, vsSource, fsSource) {
     gl.attachShader(shaderProgram, fragmentShader);
     gl.linkProgram(shaderProgram);
 
-    // If we couldn't create the shader program, alert
     if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        alert(`Unable to initialise shader program: ${gl.getProgramInfoLog(shaderProgram)}`);
+        console.log(`Unable to initialise shader program: ${gl.getProgramInfoLog(shaderProgram)}`);
         return null;
     }
 
@@ -63,7 +41,7 @@ function loadShader(gl, type, source) {
 
     // If it didn't compile, output something explaining what happened and remove it
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        alert(`Unable to compile shader: ${gl.getShaderInfoLog(shader)}`);
+        console.log(`Unable to compile shader: ${gl.getShaderInfoLog(shader)}`);
         gl.deleteShader(shader);
         return null;
     }
