@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>2D Matrices</title>
+
+    <!-- 3rd Party Libraries -->
+    <!-- gl-matrix -->
+    <script src="3rdparty/gl-matrix.js"></script>
+    <script>
+      // Destructure glMatrix so creating matrices/vectors is simpler
+      const { mat2, mat2d, mat3, mat4, vec2, vec3, vec4 } = glMatrix;
+    </script>
+
+    <!-- ES6 Modules -->
+    <script type="module" src="modules/misc-utils.js"></script>
+    <script type="module" src="modules/shaders.js"></script>
+    <script type="module" src="modules/webgl-utils.js"></script>
+
+    <!-- Main Script -->
+    <script type="module" src="main.js"></script>
+  </head>
+
+  <body>
+    <div>
+      <label for="translate-x">x</label>
+      <input id="translate-x" type="range" min="-320" max="320"><br><br>
+
+      <label for="translate-y">y</label>
+      <input id="translate-y" type="range" min="-240" max="240"><br><br>
+
+      <label for="angle">angle</label>
+      <input id="angle" type="range" min="0" max="360"><br><br>
+
+      <label for="scale-x">scaleX</label>
+      <input id="scale-x" type="range" min="-3" max="3" step="0.01"><br><br>
+
+      <label for="scale-y">scaleY</label>
+      <input id="scale-y" type="range" min="-3" max="3" step="0.01"><br><br>
+    </div>
+
+    <canvas id="gl-canvas" width="640" height="480">
+      Your browser does not support the HTML 5 canvas element!
+    </canvas>
+  </body>
+</html>
