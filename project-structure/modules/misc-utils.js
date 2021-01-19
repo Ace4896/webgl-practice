@@ -17,6 +17,24 @@ export function clamp(val, min, max) {
 }
 
 /**
+ * Converts an angle in radians to degrees.
+ * @param rad {number} The angle in radians
+ * @returns {number}
+ */
+export function toDegrees(rad) {
+  return rad / Math.PI * 180;
+}
+
+/**
+ * Converts an angle in degrees to radians.
+ * @param deg {number} The angle in degrees
+ * @returns {number}
+ */
+export function toRadians(deg) {
+  return deg / 180 * Math.PI;
+}
+
+/**
  * (Async) Loads an external text file.
  * @param url {string} The URL of the text file to load.
  * @returns {Promise<string>} The contents of this file
