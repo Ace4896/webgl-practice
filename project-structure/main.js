@@ -1,11 +1,15 @@
 import { Shader } from "./modules/shaders.js";
 
+/** @member {WebGL2RenderingContext} */
+let gl;
+
+/** @member {Shader} */
+let shader;
+
 /**
  * Draws the current scene.
- * @param gl {WebGL2RenderingContext} The WebGL rendering context
- * @param shader {Shader} The shader program to use
  */
-function drawScene(gl, shader) {
+function drawScene() {
   gl.useProgram(shader.program);
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -15,9 +19,9 @@ function drawScene(gl, shader) {
 
   // Draw a white square in the middle of the screen
   const length = 100;
-  let x1 = gl.canvas.width / 2 - length / 2;
+  let x1 = gl.canvas.clientWidth / 2 - length / 2;
   let x2 = x1 + length;
-  let y1 = gl.canvas.height / 2 - length / 2;
+  let y1 = gl.canvas.clientHeight / 2 - length / 2;
   let y2 = y1 + length;
 
   // prettier-ignore
@@ -43,16 +47,16 @@ async function main() {
     return;
   }
 
-  const gl = canvas.getContext("webgl2");
+  gl = canvas.getContext("webgl2");
   if (!gl) {
     console.log("WebGL 2 is not supported on this browser");
     return;
   }
 
   await Shader.fetchSources();
-  const shader = new Shader(gl);
+  shader = new Shader(gl);
 
-  drawScene(gl, shader);
+  drawScene();
 }
 
 window.onload = main;
