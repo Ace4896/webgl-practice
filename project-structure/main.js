@@ -5,8 +5,8 @@ import {initShaderProgram} from "./modules/webgl-utils.js";
  * Class representing a vertex/fragment shader pair.
  */
 class Shader {
-    static VERT_SOURCE = undefined;
-    static FRAG_SOURCE = undefined;
+    static VERT_SOURCE = null;
+    static FRAG_SOURCE = null;
 
     /** @property {WebGLProgram} A compiled shader program. */
     program;
@@ -30,13 +30,13 @@ class Shader {
     vao;
 
     /**
-     * Initialises this shader. Needs to be done separately due to asynchronous operations.
+     * Creates a new vertex/fragment shader program.
      * @param gl {WebGL2RenderingContext} The WebGL 2 rendering context.
      */
-    async init(gl) {
+    constructor(gl) {
         if (!Shader.VERT_SOURCE || !Shader.FRAG_SOURCE) {
-            Shader.VERT_SOURCE = await getTextFile("./shaders/shader.vert");
-            Shader.FRAG_SOURCE = await getTextFile("./shaders/shader.frag");
+            console.log("Shader sources haven't been fetched yet!");
+            return;
         }
 
         let shaderProgram = initShaderProgram(gl, Shader.VERT_SOURCE, Shader.FRAG_SOURCE);
@@ -77,6 +77,13 @@ class Shader {
                 stride,
                 offset,
             );
+        }
+    }
+
+    static async fetchSources() {
+        if (!Shader.VERT_SOURCE || !Shader.FRAG_SOURCE) {
+            Shader.VERT_SOURCE = await getTextFile("./shaders/shader.vert");
+            Shader.FRAG_SOURCE = await getTextFile("./shaders/shader.frag");
         }
     }
 }
@@ -129,8 +136,8 @@ async function main() {
         return;
     }
 
-    const shader = new Shader();
-    await shader.init(gl);
+    await Shader.fetchSources();
+    const shader = new Shader(gl);
 
     drawScene(gl, shader);
 }
